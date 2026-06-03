@@ -7,6 +7,8 @@ from datetime import date, timedelta
 from pathlib import Path
 import calendar
 import plotly.graph_objects as go
+import gspread
+from google.oauth2.service_account import Credentials
 import tema
 
 st.set_page_config(page_title="MRP — Bodegas Bianchi", page_icon="🍷", layout="wide")
@@ -18,9 +20,86 @@ GD_IDS = {
     "bom":      "1CH7jaqmfYiefoGRkHj_n4PwDDnHy1fLX9cEz7dzgqCg",
     "forecast": "1TUEwHs4S7lVJWLAHGJNZd0ZoRDBO5VMGQ4wvq816cqo",
 }
+GD_ESTADOS_ID = "1CpDx8apuRtI4G3RfN1QXLqp-pEdkATX3haj6iIfCfyE"
 
 def gsheet_url(sid, fmt="csv"):
     return f"https://docs.google.com/spreadsheets/d/{sid}/export?format={fmt}"
+
+def _gs_client():
+    try:
+        creds = Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"],
+            scopes=["https://www.googleapis.com/auth/spreadsheets"],
+        )
+        return gspread.authorize(creds)
+    except Exception:
+        return None
+
+def _oc_key(cod, fec, qty):
+    return (str(cod), str(fec), str(int(round(float(qty)))))
+
+def cargar_oc_estados_sheet():
+    """Devuelve set de keys (cod, fecha, qty) que están en estado Pendiente."""
+    gc = _gs_client()
+    if gc is None:
+        return set()
+    try:
+        ws = gc.open_by_key(GD_ESTADOS_ID).sheet1
+        records = ws.get_all_records()
+        return {_oc_key(r["codigo"], r["fecha_entrega"], r["cantidad_oc"])
+                for r in records if r.get("estado") == "🕐 Pendiente"}
+    except Exception:
+        return set()
+
+def guardar_oc_estados():
+    """Escribe en el Sheet todos los estados Pendiente actuales."""
+    gc = _gs_client()
+    if gc is None or st.session_state.oc is None:
+        return
+    oc_df = st.session_state.oc
+    # Mapa cod → [(fec, qty), ...] en orden de aparición
+    oc_idx = {}
+    for _, r in oc_df.iterrows():
+        cod = str(r["codigo"]); fec = r["fecha_entrega"]; qty = float(r["cantidad_oc"])
+        if pd.isna(fec): continue
+        oc_idx.setdefault(cod, []).append((fec, qty))
+    rows = [["codigo", "fecha_entrega", "cantidad_oc", "estado"]]
+    for cod, estados in st.session_state.mrp_oc_estados.items():
+        entries = oc_idx.get(cod, [])
+        for i, est in estados.items():
+            if est == "🕐 Pendiente" and i < len(entries):
+                fec, qty = entries[i]
+                rows.append([cod, str(fec), str(int(round(qty))), est])
+    try:
+        ws = gc.open_by_key(GD_ESTADOS_ID).sheet1
+        ws.clear()
+        ws.update("A1", rows)
+    except Exception as e:
+        st.toast(f"⚠️ No se pudieron guardar los estados: {e}", icon="⚠️")
+
+def merge_oc_estados(oc_df):
+    """Reconstruye mrp_oc_estados aplicando los estados guardados en el Sheet."""
+    pendientes = cargar_oc_estados_sheet()
+    new_estados = {}
+    new_venc_parcial = {}
+    oc_idx = {}
+    for _, r in oc_df.iterrows():
+        cod = str(r["codigo"]); fec = r["fecha_entrega"]; qty = float(r["cantidad_oc"])
+        if pd.isna(fec): continue
+        oc_idx.setdefault(cod, []).append((fec, qty))
+    for cod, entries in oc_idx.items():
+        estados_cod = {}
+        total_pend = 0.0
+        for i, (fec, qty) in enumerate(entries):
+            if fec < HOY and _oc_key(cod, fec, qty) in pendientes:
+                estados_cod[i] = "🕐 Pendiente"
+                total_pend += qty
+        if estados_cod:
+            new_estados[cod] = estados_cod
+        if total_pend > 0:
+            new_venc_parcial[cod] = total_pend
+    st.session_state.mrp_oc_estados = new_estados
+    st.session_state.mrp_oc_venc_parcial = new_venc_parcial
 
 MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"]
 HOY   = date.today()
@@ -135,6 +214,7 @@ if not st.session_state.gd_cargado:
             df["cantidad_oc"] = pd.to_numeric(df["cantidad_oc"], errors="coerce").fillna(0)
             df["fecha_entrega"] = pd.to_datetime(df["fecha_entrega"], errors="coerce").dt.date
             st.session_state.oc = df
+            merge_oc_estados(df)
 
             df = pd.read_csv(gsheet_url(GD_IDS["bom"]))
             df.columns = df.columns.str.strip().str.lower()
@@ -210,6 +290,7 @@ with st.sidebar:
             st.session_state.oc = df
             st.session_state.fid_oc = f.file_id
             st.session_state.mrp_desactualizado = True
+            merge_oc_estados(df)
             st.success(f"✓ {len(df):,} líneas OC")
         except Exception as e: st.error(str(e))
 
@@ -886,6 +967,7 @@ with tab_mrp:
                                         total_p = sum(float(oc_det[i]["Cantidad OC"]) for i in vencidas_idx)
                                         st.session_state.mrp_oc_venc_parcial[cod_sel] = total_p
                                         st.session_state.mrp_desactualizado = True
+                                        guardar_oc_estados()
                                         st.rerun()
                                 with col_br:
                                     if st.button("↺ Restablecer vencidas", key=f"btn_all_reset_{cod_sel}",
@@ -893,6 +975,7 @@ with tab_mrp:
                                         st.session_state.mrp_oc_estados[cod_sel] = {}
                                         st.session_state.mrp_oc_venc_parcial[cod_sel] = 0.0
                                         st.session_state.mrp_desactualizado = True
+                                        guardar_oc_estados()
                                         st.rerun()
 
                             estados_guardados = st.session_state.mrp_oc_estados.get(cod_sel, {})
@@ -923,6 +1006,7 @@ with tab_mrp:
                             if total_pendiente != prev_parcial:
                                 st.session_state.mrp_oc_venc_parcial[cod_sel] = total_pendiente
                                 st.session_state.mrp_desactualizado = True
+                                guardar_oc_estados()
                             if total_pendiente > 0:
                                 st.caption(f"Suma a cobertura: {round(total_pendiente):,} en estado Pendiente. Recalculá el MRP para aplicar.")
                         else:

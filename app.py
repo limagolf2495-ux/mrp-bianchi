@@ -27,8 +27,7 @@ def gsheet_url(sid, fmt="csv"):
 def _gs_client():
     try:
         return gspread.service_account_from_dict(dict(st.secrets["gcp_service_account"]))
-    except Exception as e:
-        st.warning(f"⚠️ DEBUG gs_client: {e}")
+    except Exception:
         return None
 
 def _oc_key(cod, fec, qty):

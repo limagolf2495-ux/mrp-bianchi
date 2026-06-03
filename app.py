@@ -27,7 +27,8 @@ def gsheet_url(sid, fmt="csv"):
 def _gs_client():
     try:
         return gspread.service_account_from_dict(dict(st.secrets["gcp_service_account"]))
-    except Exception:
+    except Exception as e:
+        st.warning(f"⚠️ DEBUG gs_client: {e}")
         return None
 
 def _oc_key(cod, fec, qty):
@@ -49,7 +50,9 @@ def cargar_oc_estados_sheet():
 def guardar_oc_estados():
     """Escribe en el Sheet todos los estados Pendiente actuales."""
     gc = _gs_client()
-    if gc is None or st.session_state.oc is None:
+    if gc is None:
+        return
+    if st.session_state.oc is None:
         return
     oc_df = st.session_state.oc
     # Mapa cod → [(fec, qty), ...] en orden de aparición

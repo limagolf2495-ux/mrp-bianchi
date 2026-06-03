@@ -8,7 +8,6 @@ from pathlib import Path
 import calendar
 import plotly.graph_objects as go
 import gspread
-from google.oauth2.service_account import Credentials
 import tema
 
 st.set_page_config(page_title="MRP — Bodegas Bianchi", page_icon="🍷", layout="wide")
@@ -27,11 +26,7 @@ def gsheet_url(sid, fmt="csv"):
 
 def _gs_client():
     try:
-        creds = Credentials.from_service_account_info(
-            st.secrets["gcp_service_account"],
-            scopes=["https://www.googleapis.com/auth/spreadsheets"],
-        )
-        return gspread.authorize(creds)
+        return gspread.service_account_from_dict(dict(st.secrets["gcp_service_account"]))
     except Exception:
         return None
 
@@ -75,7 +70,7 @@ def guardar_oc_estados():
         ws.clear()
         ws.update("A1", rows)
     except Exception as e:
-        st.toast(f"⚠️ No se pudieron guardar los estados: {e}", icon="⚠️")
+        st.warning(f"⚠️ No se pudieron guardar los estados en Google Sheets: {e}")
 
 def merge_oc_estados(oc_df):
     """Reconstruye mrp_oc_estados aplicando los estados guardados en el Sheet."""

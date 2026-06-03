@@ -12,6 +12,16 @@ import tema
 st.set_page_config(page_title="MRP — Bodegas Bianchi", page_icon="🍷", layout="wide")
 tema.inject()
 
+GD_IDS = {
+    "stock":    "17TsFVJw12V5ndLP_TfVaeMvy-rRA1ScUGZCJIlifM38",
+    "ordenes":  "11b__i6OcJUz1Duwzbyo6cy0pEXySob6oOXFpiS0lMCU",
+    "bom":      "1CH7jaqmfYiefoGRkHj_n4PwDDnHy1fLX9cEz7dzgqCg",
+    "forecast": "1TUEwHs4S7lVJWLAHGJNZd0ZoRDBO5VMGQ4wvq816cqo",
+}
+
+def gsheet_url(sid, fmt="csv"):
+    return f"https://docs.google.com/spreadsheets/d/{sid}/export?format={fmt}"
+
 MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"]
 HOY   = date.today()
 
@@ -105,10 +115,53 @@ DEFAULTS = {
     "mrp_desactualizado": False,
     "uploader_key": 0,
     "fid_stock": None, "fid_oc": None, "fid_bom": None, "fid_fc": None,
+    "gd_cargado": False,
 }
 for k, v in DEFAULTS.items():
     if k not in st.session_state:
         st.session_state[k] = v
+
+if not st.session_state.gd_cargado:
+    try:
+        with st.spinner("Cargando datos desde Google Drive..."):
+            df = pd.read_csv(gsheet_url(GD_IDS["stock"]))
+            df.columns = df.columns.str.strip().str.lower()
+            df["stock"] = pd.to_numeric(df["stock"], errors="coerce").fillna(0)
+            st.session_state.stock = df
+            st.session_state.fecha_corte_stock = HOY
+
+            df = pd.read_csv(gsheet_url(GD_IDS["ordenes"]))
+            df.columns = df.columns.str.strip().str.lower()
+            df["cantidad_oc"] = pd.to_numeric(df["cantidad_oc"], errors="coerce").fillna(0)
+            df["fecha_entrega"] = pd.to_datetime(df["fecha_entrega"], errors="coerce").dt.date
+            st.session_state.oc = df
+
+            df = pd.read_csv(gsheet_url(GD_IDS["bom"]))
+            df.columns = df.columns.str.strip().str.lower()
+            df["cantidad_por_unidad"] = pd.to_numeric(df["cantidad_por_unidad"], errors="coerce").fillna(0)
+            st.session_state.bom = df
+
+            df = pd.read_excel(gsheet_url(GD_IDS["forecast"], "xlsx"))
+            new_cols = []
+            for col in df.columns:
+                if hasattr(col, "month"):
+                    new_cols.append(f"{MESES[col.month-1]}_{str(col.year)[-2:]}")
+                else:
+                    new_cols.append(str(col).strip().lower())
+            df.columns = new_cols
+            df = df.loc[:, ~df.columns.duplicated()]
+            df = df.loc[:, df.columns != "nan"]
+            df = df.dropna(how="all")
+            df["articulo"] = df["articulo"].astype(str).str.strip()
+            for col in df.columns:
+                if col not in ["articulo", "descripcion"]:
+                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+            st.session_state.forecast = df
+            st.session_state.prod_listo = False
+    except Exception as e:
+        st.warning(f"⚠️ No se pudieron cargar los datos desde Google Drive: {e}")
+    finally:
+        st.session_state.gd_cargado = True
 
 uk = st.session_state.uploader_key
 

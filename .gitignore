@@ -1,0 +1,14 @@
+# Datos reales — no van al repositorio
+Archivos/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Claude Code interno
+.claude/
+
+# Planes internos
+GUIA_CLAUDE_CODE.md
+INSTRUCCIONES.md

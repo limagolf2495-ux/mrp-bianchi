@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Análisis MRP v3 — 11070300122059</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f0f2f5; color: #1a1a2e; }
+
+  .topbar {
+    background: linear-gradient(135deg, #1f2733 0%, #2d3a4a 100%);
+    padding: 24px 40px; color: white;
+    border-bottom: 3px solid #28a745;
+  }
+  .badges { margin-bottom: 10px; }
+  .badge { display: inline-block; font-size: .74rem; font-weight: 700; padding: 3px 10px; border-radius: 12px; margin-right: 6px; letter-spacing: .4px; }
+  .badge.v3   { background: #28a745; }
+  .badge.ok   { background: #1e5e3a; }
+  .badge.warn { background: #e07800; }
+  .badge.info { background: #4a90d9; }
+  .topbar h1  { font-size: 1.4rem; font-weight: 700; }
+  .topbar .sub { font-size: .84rem; color: #9ab; margin-top: 4px; }
+  .topbar .meta { margin-top: 10px; font-size: .8rem; color: #7a9; display: flex; gap: 24px; flex-wrap: wrap; }
+  .topbar .meta span strong { color: #fff; }
+
+  .container { max-width: 1120px; margin: 0 auto; padding: 32px 24px; }
+
+  /* ── COMPARATIVA v2→v3 ── */
+  .diff-bar {
+    background: white; border-radius: 12px; padding: 20px 24px; margin-bottom: 28px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    border-left: 5px solid #28a745;
+  }
+  .diff-bar h2 { font-size: .9rem; font-weight: 700; color: #1e5e3a; margin-bottom: 14px; }
+  .diff-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .diff-item { background: #f8f9fa; border-radius: 8px; padding: 12px 14px; }
+  .diff-item .lbl { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #888; margin-bottom: 6px; }
+  .diff-item .old { font-size: .82rem; color: #d9534f; text-decoration: line-through; }
+  .diff-item .new { font-size: 1.1rem; font-weight: 800; color: #28a745; }
+  .diff-item .unchanged { font-size: 1rem; font-weight: 700; color: #555; }
+
+  /* ── ALERTA INFO ── */
+  .alerta {
+    border-radius: 12px; padding: 16px 22px; margin-bottom: 22px;
+    display: flex; align-items: flex-start; gap: 14px;
+  }
+  .alerta.ok   { background: #e8f4ec; border: 1.5px solid #28a745; }
+  .alerta.warn { background: #fff3cd; border: 1.5px solid #e07800; }
+  .alerta.err  { background: #fbecea; border: 1.5px solid #d9534f; }
+  .alerta .icon { font-size: 1.5rem; line-height: 1; flex-shrink: 0; }
+  .alerta h3 { font-size: .9rem; font-weight: 700; margin-bottom: 4px; }
+  .alerta.ok   h3 { color: #1e5e3a; }
+  .alerta.warn h3 { color: #7a4f00; }
+  .alerta.err  h3 { color: #7a221c; }
+  .alerta p  { font-size: .84rem; line-height: 1.6; color: #444; }
+
+  /* ── CARDS ── */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .card { background: white; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 4px rgba(0,0,0,.08); border-top: 4px solid #ddd; }
+  .card.ok   { border-top-color: #28a745; }
+  .card.info { border-top-color: #4a90d9; }
+  .card.warn { border-top-color: #e07800; }
+  .card.blue { border-top-color: #6c5ce7; }
+  .card .lbl { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #888; margin-bottom: 6px; }
+  .card .val { font-size: 1.65rem; font-weight: 800; color: #1a1a2e; line-height: 1; }
+  .card .val.grn { color: #28a745; }
+  .card .val.blu { color: #4a90d9; }
+  .card .val.ora { color: #e07800; }
+  .card .val.pur { color: #6c5ce7; }
+  .card .sub { font-size: .74rem; color: #999; margin-top: 6px; }
+
+  /* ── SECCIÓN ── */
+  .section { background: white; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .section h3 { font-size: 1rem; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+  .section .h3-sub { font-size: .8rem; color: #888; margin-bottom: 18px; margin-left: 34px; }
+  .section h3 .num { background: #1f2733; color: white; border-radius: 50%; width: 24px; height: 24px; font-size: .72rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+  /* ── FÓRMULA ── */
+  .formula-box { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 16px 20px; font-family: monospace; font-size: .86rem; line-height: 2.1; }
+  .f-line { display: flex; align-items: baseline; gap: 10px; }
+  .f-lbl  { color: #888; width: 220px; flex-shrink: 0; font-size: .78rem; font-family: sans-serif; }
+  .f-val  { font-weight: 700; color: #1a1a2e; }
+  .f-val.grn { color: #28a745; }
+  .f-val.red { color: #d9534f; }
+  .f-val.ora { color: #e07800; }
+  .f-val.pur { color: #6c5ce7; font-size: 1.05rem; }
+  .f-sep  { border: none; border-top: 1.5px solid #aaa; margin: 4px 0; }
+
+  /* ── COBERTURA ── */
+  .cov-row   { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .cov-label { font-size: .76rem; width: 150px; flex-shrink: 0; color: #555; }
+  .cov-track { flex: 1; background: #eee; border-radius: 6px; height: 22px; display: flex; overflow: hidden; }
+  .cov-seg   { height: 100%; display: flex; align-items: center; justify-content: center; font-size: .68rem; font-weight: 700; color: white; overflow: hidden; white-space: nowrap; }
+  .cov-seg.ok   { background: #28a745; }
+  .cov-seg.parc { background: #e07800; }
+  .cov-seg.none { background: #d9534f; }
+  .cov-val   { font-size: .76rem; width: 90px; text-align: right; flex-shrink: 0; color: #444; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .cov-rem   { font-size: .73rem; width: 110px; text-align: right; flex-shrink: 0; color: #888; font-variant-numeric: tabular-nums; }
+  .mes-titulo { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin: 14px 0 8px; }
+
+  /* ── TABLA ── */
+  table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+  thead th { background: #1f2733; color: white; padding: 9px 13px; text-align: left; font-weight: 600; font-size: .76rem; letter-spacing: .4px; white-space: nowrap; }
+  thead th.r { text-align: right; }
+  tbody tr:nth-child(even) { background: #f8f9fa; }
+  tbody td { padding: 8px 13px; border-bottom: 1px solid #eee; white-space: nowrap; }
+  tbody td.r { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr.cubierto td { background: #e8f4ec !important; }
+  tbody tr.quiebre  td { background: #fbecea !important; }
+  tbody tr.vacio    td { color: #bbb; }
+  tbody tr.total-row td { background: #f0f2f5; font-weight: 700; }
+  .tag { font-size: .73rem; font-weight: 700; padding: 2px 8px; border-radius: 8px; display: inline-block; }
+  .tag.verde { background: #e8f4ec; color: #1e5e3a; }
+  .tag.rojo  { background: #fbecea; color: #7a221c; }
+  .tag.gris  { background: #e9ecef; color: #555; }
+
+  /* ── TIMELINE ── */
+  .timeline { position: relative; padding-left: 28px; }
+  .timeline::before { content: ''; position: absolute; left: 10px; top: 8px; bottom: 8px; width: 2px; background: #dee2e6; }
+  .tl-item { position: relative; margin-bottom: 14px; }
+  .tl-dot  { position: absolute; left: -22px; top: 5px; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; }
+  .tl-dot.pronto { background: #e07800; }
+  .tl-dot.normal { background: #4a90d9; }
+  .tl-dot.futuro { background: #6c5ce7; }
+  .tl-card { background: white; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px 16px; display: flex; align-items: center; gap: 16px; }
+  .tl-card.pronto { border-color: #e07800; background: #fff8f0; }
+  .tl-card.normal { border-color: #4a90d9; background: #f0f6ff; }
+  .tl-card.futuro { border-color: #6c5ce7; background: #f5f3ff; }
+  .tl-body { flex: 1; }
+  .tl-semana { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #888; margin-bottom: 1px; }
+  .tl-fechas { font-size: .8rem; color: #555; }
+  .tl-para   { font-size: .75rem; color: #999; margin-top: 2px; }
+  .tl-qty    { font-size: 1.15rem; font-weight: 800; white-space: nowrap; }
+  .tl-qty.pronto { color: #e07800; }
+  .tl-qty.normal { color: #4a90d9; }
+  .tl-qty.futuro { color: #6c5ce7; }
+
+  /* ── OC GRID ── */
+  .oc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .oc-card { border-radius: 8px; padding: 12px 14px; background: #e8f4ec; border: 1.5px solid #28a745; }
+  .oc-qty    { font-size: 1.25rem; font-weight: 800; color: #1a1a2e; }
+  .oc-fecha  { font-size: .76rem; color: #555; margin-top: 2px; }
+  .oc-status { font-size: .72rem; font-weight: 700; margin-top: 6px; color: #1e5e3a; }
+
+  /* ── ALERTA CSV ── */
+  .csv-warn { background: #fff3cd; border: 1.5px solid #e07800; border-radius: 10px; padding: 14px 18px; margin-top: 20px; font-size: .83rem; color: #7a4f00; }
+  .csv-warn strong { color: #5a3a00; }
+  .csv-warn code { background: rgba(0,0,0,.07); padding: 1px 5px; border-radius: 4px; font-size: .8rem; }
+
+  .footer { text-align: center; font-size: .76rem; color: #aaa; margin-top: 32px; padding-bottom: 28px; }
+
+  @media (max-width: 640px) {
+    .topbar { padding: 18px 20px; }
+    .container { padding: 18px 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="badges">
+    <span class="badge v3">v3 · Stock corregido</span>
+    <span class="badge ok">✓ TODO JUNIO CUBIERTO</span>
+    <span class="badge info">Primer pedido: 15/06</span>
+    <span class="badge info">HOY: 06/06/2026</span>
+  </div>
+  <h1>CAP COMPLEX D.V. LACRADO TINTO 28.75 × 55</h1>
+  <div class="sub">Insumo 11070300122059 · Tipo: CAPSULAS COMPLEX · Lead time: 15 días · Múltiplo: 500</div>
+  <div class="meta">
+    <span>Artículo: <strong>7790703000140 DON VALENTIN RED 6×750</strong></span>
+    <span>BOM: <strong>6 cápsulas por caja</strong></span>
+    <span>Horizonte: <strong>Jun + Jul + Ago 2026 · 16 semanas</strong></span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- COMPARATIVA v2 → v3 -->
+  <div class="diff-bar">
+    <h2>✓ Cambios respecto al informe anterior (v2)</h2>
+    <div class="diff-grid">
+      <div class="diff-item">
+        <div class="lbl">Stock registrado</div>
+        <div class="old">0 (NaN — error CSV)</div>
+        <div class="new">119,879</div>
+      </div>
+      <div class="diff-item">
+        <div class="lbl">Cobertura total</div>
+        <div class="old">615,920</div>
+        <div class="new">735,799</div>
+      </div>
+      <div class="diff-item">
+        <div class="lbl">Sugerencia de compra</div>
+        <div class="old">1,466,000</div>
+        <div class="new">1,346,000</div>
+      </div>
+      <div class="diff-item">
+        <div class="lbl">Primer quiebre</div>
+        <div class="old">Jun S5 (29/06)</div>
+        <div class="new">Jul S1 (01/07)</div>
+      </div>
+      <div class="diff-item">
+        <div class="lbl">Demanda total</div>
+        <div class="unchanged">2,081,550 (sin cambio)</div>
+      </div>
+      <div class="diff-item">
+        <div class="lbl">Pedidos no asignados</div>
+        <div class="old">169,530 (bug v2)</div>
+        <div class="new">0 — cuadra exacto</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ALERTAS -->
+  <div class="alerta ok">
+    <div class="icon">✅</div>
+    <div>
+      <h3>Todo junio cubierto — margen hasta el 30/06</h3>
+      <p>Con stock de 119,879 + OC pendientes (615,920) = <strong>735,799 unidades de cobertura</strong>, las 5 semanas de junio quedan completamente cubiertas. Al cierre de junio quedan 28,243 unidades remanentes. El primer quiebre ocurre en Jul S1 (01/07).</p>
+    </div>
+  </div>
+
+  <div class="alerta warn">
+    <div class="icon">⚠️</div>
+    <div>
+      <h3>Primer pedido: Jun S3 (15–21/06) — 9 días de margen</h3>
+      <p>Para cubrir julio y agosto sin interrupciones, la primera orden (319,685 unidades) debe emitirse entre el <strong>15 y el 21 de junio</strong>. No hay urgencia esta semana, pero hay que activar el proceso con el proveedor dentro de 9 días.</p>
+    </div>
+  </div>
+
+  <!-- CARDS KPI -->
+  <div class="cards">
+    <div class="card ok">
+      <div class="lbl">Stock físico</div>
+      <div class="val grn">119,879</div>
+      <div class="sub">Corregido desde stock.csv</div>
+    </div>
+    <div class="card ok">
+      <div class="lbl">OC pendientes</div>
+      <div class="val grn">615,920</div>
+      <div class="sub">5 OC marcadas Pendiente</div>
+    </div>
+    <div class="card ok">
+      <div class="lbl">Cobertura total</div>
+      <div class="val grn">735,799</div>
+      <div class="sub">Stock + OC pendientes</div>
+    </div>
+    <div class="card info">
+      <div class="lbl">Demanda horizonte</div>
+      <div class="val blu">2,081,550</div>
+      <div class="sub">Jun + Jul + Ago · 16 semanas</div>
+    </div>
+    <div class="card warn">
+      <div class="lbl">Brecha a cubrir</div>
+      <div class="val ora">1,345,751</div>
+      <div class="sub">Demanda − Cobertura</div>
+    </div>
+    <div class="card blue">
+      <div class="lbl">Sugerencia de compra</div>
+      <div class="val pur">1,346,000</div>
+      <div class="sub">Redondeo a múltiplo 500</div>
+    </div>
+  </div>
+
+  <!-- FÓRMULA -->
+  <div class="section">
+    <h3><span class="num">1</span> Cálculo paso a paso</h3>
+    <div class="h3-sub">Stock real confirmado · OC todas en estado Pendiente</div>
+    <div class="formula-box">
+      <div class="f-line"><span class="f-lbl">Forecast jun_26 (cajas)</span><span class="f-val">117,926</span></div>
+      <div class="f-line"><span class="f-lbl">Forecast jul_26 (cajas)</span><span class="f-val">115,978</span></div>
+      <div class="f-line"><span class="f-lbl">Forecast ago_26 (cajas)</span><span class="f-val">113,021</span></div>
+      <div class="f-line"><span class="f-lbl">× BOM (6 cáps/caja)</span><span class="f-val">× 6</span></div>
+      <hr class="f-sep">
+      <div class="f-line"><span class="f-lbl">Demanda total (cápsulas)</span><span class="f-val">2,081,550</span></div>
+      <div style="height:8px"></div>
+      <div class="f-line"><span class="f-lbl">− Stock físico</span><span class="f-val grn">− 119,879</span></div>
+      <div class="f-line"><span class="f-lbl">− OC vigente (futuras)</span><span class="f-val red">0</span></div>
+      <div class="f-line"><span class="f-lbl">− OC pendientes (5 OC)</span><span class="f-val grn">− 615,920</span></div>
+      <hr class="f-sep">
+      <div class="f-line"><span class="f-lbl">Brecha (nec. neta)</span><span class="f-val ora">1,345,751</span></div>
+      <div class="f-line"><span class="f-lbl">Redondeo a múltiplo 500</span><span class="f-val pur">→ SUGERENCIA: 1,346,000</span></div>
+    </div>
+  </div>
+
+  <!-- OC -->
+  <div class="section">
+    <h3><span class="num">2</span> Órdenes de compra — todas Pendiente</h3>
+    <div class="h3-sub">615,920 unidades · suman a cobertura en el cálculo</div>
+    <div class="oc-grid">
+      <div class="oc-card"><div class="oc-qty">250,000</div><div class="oc-fecha">Entrega original: 09/02/2026</div><div class="oc-status">✓ Pendiente</div></div>
+      <div class="oc-card"><div class="oc-qty">5,920</div><div class="oc-fecha">Entrega original: 16/02/2026</div><div class="oc-status">✓ Pendiente</div></div>
+      <div class="oc-card"><div class="oc-qty">120,000</div><div class="oc-fecha">Entrega original: 08/05/2026</div><div class="oc-status">✓ Pendiente</div></div>
+      <div class="oc-card"><div class="oc-qty">120,000</div><div class="oc-fecha">Entrega original: 15/05/2026</div><div class="oc-status">✓ Pendiente</div></div>
+      <div class="oc-card"><div class="oc-qty">120,000</div><div class="oc-fecha">Entrega original: 22/05/2026</div><div class="oc-status">✓ Pendiente</div></div>
+    </div>
+  </div>
+
+  <!-- COBERTURA SEMANAL -->
+  <div class="section">
+    <h3><span class="num">3</span> Cobertura semana a semana</h3>
+    <div class="h3-sub">Cobertura inicial: 735,799 · El remanente se consume semana a semana</div>
+
+    <div style="display:flex;gap:8px;margin-bottom:4px;">
+      <span style="font-size:.72rem;color:#888;">Leyenda:</span>
+      <span style="font-size:.72rem;background:#e8f4ec;color:#1e5e3a;padding:1px 8px;border-radius:4px;font-weight:700;">✓ Cubierto</span>
+      <span style="font-size:.72rem;background:#fbecea;color:#7a221c;padding:1px 8px;border-radius:4px;font-weight:700;">🔴 Quiebre</span>
+    </div>
+    <div style="font-size:.7rem;color:#aaa;margin-bottom:16px;">La barra muestra el % de necesidad cubierta. El remanente indica stock disponible al fin de cada semana.</div>
+
+    <div class="mes-titulo" style="color:#4a90d9;">JUNIO 2026 — Todo cubierto ✓</div>
+    <div class="cov-row">
+      <div class="cov-label">S1 · 01–07/06 · 176,892</div>
+      <div class="cov-track"><div class="cov-seg ok" style="width:100%">✓ 176,892 cubiertas</div></div>
+      <div class="cov-val" style="color:#28a745">CUBIERTO</div>
+      <div class="cov-rem">rem: 558,907</div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-label">S2 · 08–14/06 · 176,892</div>
+      <div class="cov-track"><div class="cov-seg ok" style="width:100%">✓ 176,892 cubiertas</div></div>
+      <div class="cov-val" style="color:#28a745">CUBIERTO</div>
+      <div class="cov-rem">rem: 382,015</div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-label">S3 · 15–21/06 · 176,892</div>
+      <div class="cov-track"><div class="cov-seg ok" style="width:100%">✓ 176,892 cubiertas</div></div>
+      <div class="cov-val" style="color:#28a745">CUBIERTO</div>
+      <div class="cov-rem">rem: 205,123</div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-label">S4 · 22–28/06 · 106,134</div>
+      <div class="cov-track"><div class="cov-seg ok" style="width:100%">✓ 106,134 cubiertas</div></div>
+      <div class="cov-val" style="color:#28a745">CUBIERTO</div>
+      <div class="cov-rem">rem: 98,989</div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-label">S5 · 29–30/06 · 70,746</div>
+      <div class="cov-track"><div class="cov-seg ok" style="width:100%">✓ 70,746 cubiertas</div></div>
+      <div class="cov-val" style="color:#28a745">CUBIERTO</div>
+      <div class="cov-rem">rem: 28,243</div>
+    </div>
+
+    <div class="mes-titulo" style="color:#d9534f;margin-top:18px;">JULIO 2026 — Quiebre desde S1</div>
+    <div class="cov-row">
+      <div class="cov-label">S1 · 01–05/07 · 173,964</div>
+      <div class="cov-track">
+        <div class="cov-seg ok" style="width:16%">28,243</div>
+        <div class="cov-seg none" style="width:84%">−145,721</div>
+      </div>
+      <div class="cov-val" style="color:#d9534f">QUIEBRE</div>
+      <div class="cov-rem">rem: 0</div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-label">S2 · 06–12/07 · 173,964</div>
+      <div class="cov-track"><div class="cov-seg none" style="width:100%">sin cobertura</div></div>
+      <div class="cov-val" style="color:#d9534f">QUIEBRE</div>
+      <div class="cov-rem">rem: 0</div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-label">S3 · 13–19/07 · 173,964</div>
+      <div class="cov-track"><div class="cov-seg none" style="width:100%">sin cobertura</div></div>
+      <div class="cov-val" style="color:#d9534f">QUIEBRE</div>
+      <div class="cov-rem">rem: 0</div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-label">S4 · 20–26/07 · 104,382</div>
+      <div class="cov-track"><div class="cov-seg none" style="width:100%">sin cobertura</div></div>
+      <div class="cov-val" style="color:#d9534f">QUIEBRE</div>
+      <div class="cov-rem">rem: 0</div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-label">S5 · 27–31/07 · 69,594</div>
+      <div class="cov-track"><div class="cov-seg none" style="width:100%">sin cobertura</div></div>
+      <div class="cov-val" style="color:#d9534f">QUIEBRE</div>
+      <div class="cov-rem">rem: 0</div>
+    </div>
+
+    <div class="mes-titulo" style="color:#d9534f;margin-top:18px;">AGOSTO 2026 — Quiebre completo</div>
+    <div class="cov-row">
+      <div class="cov-label">S1 · 01–02/08 · 169,530</div>
+      <div class="cov-track"><div class="cov-seg none" style="width:100%">sin cobertura</div></div>
+      <div class="cov-val" style="color:#d9534f">QUIEBRE</div>
+      <div class="cov-rem">rem: 0</div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-label">S2 · 03–09/08 · 169,530</div>
+      <div class="cov-track"><div class="cov-seg none" style="width:100%">sin cobertura</div></div>
+      <div class="cov-val" style="color:#d9534f">QUIEBRE</div>
+      <div class="cov-rem">rem: 0</div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-label">S3 · 10–16/08 · 169,530</div>
+      <div class="cov-track"><div class="cov-seg none" style="width:100%">sin cobertura</div></div>
+      <div class="cov-val" style="color:#d9534f">QUIEBRE</div>
+      <div class="cov-rem">rem: 0</div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-label">S4 · 17–23/08 · 101,718</div>
+      <div class="cov-track"><div class="cov-seg none" style="width:100%">sin cobertura</div></div>
+      <div class="cov-val" style="color:#d9534f">QUIEBRE</div>
+      <div class="cov-rem">rem: 0</div>
+    </div>
+    <div class="cov-row">
+      <div class="cov-label">S5 · 24–30/08 · 67,818</div>
+      <div class="cov-track"><div class="cov-seg none" style="width:100%">sin cobertura</div></div>
+      <div class="cov-val" style="color:#d9534f">QUIEBRE</div>
+      <div class="cov-rem">rem: 0</div>
+    </div>
+    <div class="cov-row" style="opacity:.4;">
+      <div class="cov-label">S6 · 31/08 · 0</div>
+      <div class="cov-track"></div>
+      <div class="cov-val">—</div>
+      <div class="cov-rem">sin demanda</div>
+    </div>
+  </div>
+
+  <!-- TABLA -->
+  <div class="section">
+    <h3><span class="num">4</span> Detalle numérico semana a semana</h3>
+    <div class="h3-sub">Necesidad · compra sugerida · remanente de cobertura</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Semana</th><th>Período</th>
+          <th class="r">Necesidad</th>
+          <th class="r">Compra necesaria</th>
+          <th class="r">Remanente cob.</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="cubierto"><td>Jun S1</td><td>01–07/06</td><td class="r">176,892</td><td class="r">—</td><td class="r">558,907</td><td><span class="tag verde">✓ Cubierto</span></td></tr>
+        <tr class="cubierto"><td>Jun S2</td><td>08–14/06</td><td class="r">176,892</td><td class="r">—</td><td class="r">382,015</td><td><span class="tag verde">✓ Cubierto</span></td></tr>
+        <tr class="cubierto"><td>Jun S3</td><td>15–21/06</td><td class="r">176,892</td><td class="r">—</td><td class="r">205,123</td><td><span class="tag verde">✓ Cubierto</span></td></tr>
+        <tr class="cubierto"><td>Jun S4</td><td>22–28/06</td><td class="r">106,134</td><td class="r">—</td><td class="r">98,989</td><td><span class="tag verde">✓ Cubierto</span></td></tr>
+        <tr class="cubierto"><td>Jun S5</td><td>29–30/06</td><td class="r">70,746</td><td class="r">—</td><td class="r">28,243</td><td><span class="tag verde">✓ Cubierto</span></td></tr>
+        <tr class="quiebre"><td><strong>Jul S1</strong></td><td>01–05/07</td><td class="r">173,964</td><td class="r"><strong>145,721</strong></td><td class="r">0</td><td><span class="tag rojo">🔴 Quiebre</span></td></tr>
+        <tr class="quiebre"><td>Jul S2</td><td>06–12/07</td><td class="r">173,964</td><td class="r">173,964</td><td class="r">0</td><td><span class="tag rojo">🔴 Quiebre</span></td></tr>
+        <tr class="quiebre"><td>Jul S3</td><td>13–19/07</td><td class="r">173,964</td><td class="r">173,964</td><td class="r">0</td><td><span class="tag rojo">🔴 Quiebre</span></td></tr>
+        <tr class="quiebre"><td>Jul S4</td><td>20–26/07</td><td class="r">104,382</td><td class="r">104,382</td><td class="r">0</td><td><span class="tag rojo">🔴 Quiebre</span></td></tr>
+        <tr class="quiebre"><td>Jul S5</td><td>27–31/07</td><td class="r">69,594</td><td class="r">69,594</td><td class="r">0</td><td><span class="tag rojo">🔴 Quiebre</span></td></tr>
+        <tr class="quiebre"><td>Ago S1</td><td>01–02/08</td><td class="r">169,530</td><td class="r">169,530</td><td class="r">0</td><td><span class="tag rojo">🔴 Quiebre</span></td></tr>
+        <tr class="quiebre"><td>Ago S2</td><td>03–09/08</td><td class="r">169,530</td><td class="r">169,530</td><td class="r">0</td><td><span class="tag rojo">🔴 Quiebre</span></td></tr>
+        <tr class="quiebre"><td>Ago S3</td><td>10–16/08</td><td class="r">169,530</td><td class="r">169,530</td><td class="r">0</td><td><span class="tag rojo">🔴 Quiebre</span></td></tr>
+        <tr class="quiebre"><td>Ago S4</td><td>17–23/08</td><td class="r">101,718</td><td class="r">101,718</td><td class="r">0</td><td><span class="tag rojo">🔴 Quiebre</span></td></tr>
+        <tr class="quiebre"><td>Ago S5</td><td>24–30/08</td><td class="r">67,818</td><td class="r">67,818</td><td class="r">0</td><td><span class="tag rojo">🔴 Quiebre</span></td></tr>
+        <tr class="vacio"><td>Ago S6</td><td>31/08</td><td class="r">0</td><td class="r">—</td><td class="r">0</td><td><span class="tag gris">sin demanda</span></td></tr>
+        <tr class="total-row">
+          <td colspan="2">TOTAL</td>
+          <td class="r">2,081,550</td>
+          <td class="r" style="color:#6c5ce7;">1,345,751 → <strong>1,346,000</strong></td>
+          <td class="r">—</td><td></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- CRONOGRAMA -->
+  <div class="section">
+    <h3><span class="num">5</span> Cronograma de pedidos a emitir</h3>
+    <div class="h3-sub">Lead time 15 días · 8 lotes · total exacto: 1,345,751 (sin discrepancias)</div>
+
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-dot pronto"></div>
+        <div class="tl-card pronto">
+          <div class="tl-body">
+            <div class="tl-semana">⚠ PRIMER PEDIDO — JUN S3</div>
+            <div class="tl-fechas">Emitir 15–21/06/2026 · entrega estimada: 30/06–06/07</div>
+            <div class="tl-para">Para cubrir Jul S2 (173,964) + Jul S3 (145,721 restantes de Jul S1)</div>
+          </div>
+          <div class="tl-qty pronto">319,685</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot pronto"></div>
+        <div class="tl-card pronto">
+          <div class="tl-body">
+            <div class="tl-semana">JUN S4</div>
+            <div class="tl-fechas">Emitir 22–28/06/2026 · entrega estimada: 07–13/07</div>
+            <div class="tl-para">Para cubrir Jul S3 (13–19/07)</div>
+          </div>
+          <div class="tl-qty pronto">173,964</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot normal"></div>
+        <div class="tl-card normal">
+          <div class="tl-body">
+            <div class="tl-semana">JUL S1</div>
+            <div class="tl-fechas">Emitir 01–05/07/2026 · entrega estimada: 16–22/07</div>
+            <div class="tl-para">Para cubrir Jul S4 (20–26/07)</div>
+          </div>
+          <div class="tl-qty normal">104,382</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot normal"></div>
+        <div class="tl-card normal">
+          <div class="tl-body">
+            <div class="tl-semana">JUL S2</div>
+            <div class="tl-fechas">Emitir 06–12/07/2026 · entrega estimada: 21–27/07</div>
+            <div class="tl-para">Para cubrir Jul S5 (27–31/07)</div>
+          </div>
+          <div class="tl-qty normal">69,594</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot normal"></div>
+        <div class="tl-card normal">
+          <div class="tl-body">
+            <div class="tl-semana">JUL S3</div>
+            <div class="tl-fechas">Emitir 13–19/07/2026 · entrega estimada: 28/07–03/08</div>
+            <div class="tl-para">Para cubrir Ago S1 (169,530) + Ago S2 (169,530)</div>
+          </div>
+          <div class="tl-qty normal">339,060</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot futuro"></div>
+        <div class="tl-card futuro">
+          <div class="tl-body">
+            <div class="tl-semana">JUL S4</div>
+            <div class="tl-fechas">Emitir 20–26/07/2026 · entrega estimada: 04–10/08</div>
+            <div class="tl-para">Para cubrir Ago S3 (10–16/08)</div>
+          </div>
+          <div class="tl-qty futuro">169,530</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot futuro"></div>
+        <div class="tl-card futuro">
+          <div class="tl-body">
+            <div class="tl-semana">AGO S1</div>
+            <div class="tl-fechas">Emitir 01–02/08/2026 · entrega estimada: 16–18/08</div>
+            <div class="tl-para">Para cubrir Ago S4 (17–23/08)</div>
+          </div>
+          <div class="tl-qty futuro">101,718</div>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot futuro"></div>
+        <div class="tl-card futuro">
+          <div class="tl-body">
+            <div class="tl-semana">AGO S2</div>
+            <div class="tl-fechas">Emitir 03–09/08/2026 · entrega estimada: 18–24/08</div>
+            <div class="tl-para">Para cubrir Ago S5 (24–30/08)</div>
+          </div>
+          <div class="tl-qty futuro">67,818</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:18px;background:#f0f6ff;border:1px solid #4a90d9;border-radius:8px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+      <span style="font-size:.84rem;color:#1a4a8a;font-weight:600;">8 pedidos · Total exacto sin discrepancias:</span>
+      <span style="font-size:1.2rem;font-weight:900;color:#6c5ce7;">1,345,751 → <strong>1,346,000</strong> (múltiplo 500)</span>
+    </div>
+
+    <!-- ALERTA CSV -->
+    <div class="csv-warn">
+      <strong>⚠ Problema detectado en stock.csv (archivo local):</strong> el archivo tiene columnas con nombres de JDE
+      (<code>PRODDTA Fn_Exp_Form_Cost[Cod. Composición]</code>, <code>[stock]</code>) que no coinciden con los que espera la app
+      (<code>codigo</code>, <code>stock</code>). Al cargar localmente, el stock aparece como NaN. El valor correcto (119,879)
+      se leyó directamente del CSV. Se recomienda renombrar las columnas del archivo o actualizar la hoja de Google Drive
+      para que el sistema refleje el stock real automáticamente.
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Análisis v3 · Stock corregido al 06/06/2026 · MRP Bodegas Bianchi · Insumo 11070300122059
+</div>
+
+</body>
+</html>

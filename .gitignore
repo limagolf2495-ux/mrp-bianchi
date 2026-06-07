@@ -1,6 +1,10 @@
 # Datos reales — no van al repositorio
 Archivos/
 
+# Credenciales y secretos
+.env
+.streamlit/secrets.toml
+
 # Python
 __pycache__/
 *.pyc

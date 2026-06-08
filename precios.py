@@ -47,6 +47,8 @@ def procesar_precios_pbi(df):
             nat_count, len(result),
         )
     result = result[result["precio_unitario"].notna() & (result["precio_unitario"] > 0)].copy()
-    result = result.sort_values("fecha_ultima_oc")
-    result = result.groupby("codigo", as_index=False).last()
+    # na_position="first" → NaT queda antes que las fechas válidas; keep="last" toma
+    # la fila más reciente, garantizando que precio y fecha vengan del mismo registro.
+    result = result.sort_values("fecha_ultima_oc", ascending=True, na_position="first")
+    result = result.drop_duplicates(subset=["codigo"], keep="last")
     return result[["codigo", "precio_unitario", "fecha_ultima_oc"]], None

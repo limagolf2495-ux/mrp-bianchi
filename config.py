@@ -53,4 +53,5 @@ DEFAULTS = {
     "reglas_pt_cargadas": False,
     "fid_spt": None, "fid_ven": None, "fid_ped": None,
     "precios": None, "fid_precios": None, "precios_col_candidatas": None,
+    "plan_manual": False,
 }

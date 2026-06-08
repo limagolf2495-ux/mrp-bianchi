@@ -138,7 +138,7 @@ def render_sidebar():
                 df = pd.read_csv(f, dtype=str)
                 df.columns = df.columns.str.strip().str.lower()
                 df["articulo"] = df["articulo"].astype(str).str.strip()
-                df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce", dayfirst=True)
+                df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce", dayfirst=False)
                 df["cantidad"] = pd.to_numeric(df["cantidad"], errors="coerce").fillna(0)
                 total_filas = len(df)
                 df = df[df["fecha"].dt.month == hoy.month]
@@ -159,7 +159,7 @@ def render_sidebar():
                 df = pd.read_csv(f, dtype=str)
                 df.columns = df.columns.str.strip().str.lower()
                 df["articulo"] = df["articulo"].astype(str).str.strip()
-                df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce", dayfirst=True)
+                df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce", dayfirst=False)
                 df["cantidad"] = pd.to_numeric(df["cantidad"], errors="coerce").fillna(0)
                 total_filas = len(df)
                 df = df[df["fecha"].dt.month == hoy.month]

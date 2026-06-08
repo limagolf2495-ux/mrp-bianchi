@@ -159,18 +159,22 @@ def render_sidebar():
                 df = pd.read_csv(f, dtype=str)
                 df.columns = df.columns.str.strip().str.lower()
                 df["articulo"] = df["articulo"].astype(str).str.strip()
-                df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce", dayfirst=False)
                 df["cantidad"] = pd.to_numeric(df["cantidad"], errors="coerce").fillna(0)
                 total_filas = len(df)
-                df = df[df["fecha"].dt.month == hoy.month]
-                df = df[df["fecha"].dt.year == hoy.year]
+                if "fecha" in df.columns:
+                    df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce", dayfirst=False)
+                    df = df[df["fecha"].dt.month == hoy.month]
+                    df = df[df["fecha"].dt.year == hoy.year]
+                    filtro_msg = f" → filtro {hoy.strftime('%b %Y')}"
+                else:
+                    filtro_msg = " · sin fecha (totales)"
                 df = df.groupby("articulo", as_index=False)["cantidad"].sum()
                 df = df.rename(columns={"cantidad": "pedidos_mes"})
                 st.session_state.pedidos_pt = df
                 st.session_state.fid_ped = f.file_id
                 st.session_state.plan_calculado = False
                 st.success(f"✓ {len(df):,} artículos · {int(df['pedidos_mes'].sum()):,} uds "
-                           f"({total_filas:,} líneas → filtro {hoy.strftime('%b %Y')})")
+                           f"({total_filas:,} líneas{filtro_msg})")
             except Exception as e: st.error(str(e))
 
         st.markdown("---")

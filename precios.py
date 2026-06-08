@@ -37,7 +37,7 @@ def procesar_precios_pbi(df):
     result["codigo"]          = df["articulo"].astype(str).str.strip()
     result["precio_unitario"] = df["costo_unitario"].apply(_parse_precio_arg)
     result["fecha_ultima_oc"] = pd.to_datetime(
-        df["fecha_recepcion"], dayfirst=True, errors="coerce"
+        df["fecha_recepcion"], dayfirst=False, errors="coerce"
     )
     nat_count = result["fecha_ultima_oc"].isna().sum()
     if nat_count > 0:

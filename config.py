@@ -13,6 +13,7 @@ COLS_STOCK_REQ = [COL_STOCK_COD, COL_STOCK_DESC, COL_STOCK_TIPO, COL_STOCK_QTY]
 COL_OC_COD   = "codigo"
 COL_OC_QTY   = "cantidad_oc"
 COL_OC_FECHA = "fecha_entrega"
+COL_OC_ID    = "id"  # N° de OC JDE (ej. O9-22320) — opcional, no requerida
 COLS_OC_REQ  = [COL_OC_COD, COL_OC_QTY, COL_OC_FECHA]
 
 # Columnas requeridas en bom.csv / tabla BOM de Google Drive
@@ -47,6 +48,9 @@ DEFAULTS = {
     "uploader_key": 0,
     "fid_stock": None, "fid_oc": None, "fid_bom": None, "fid_fc": None,
     "gd_cargado": False,
+    "gd_fechas": {},            # {key: datetime} — modifiedTime de archivos en Drive
+    "oc_raw": None,             # OC sin filtrar por demanda del forecast
+    "oc_descartadas": 0,        # líneas OC descartadas por no tener demanda
     "stock_pt": None, "ventas_pt": None, "pedidos_pt": None,
     "reglas_pt": {},
     "plan_calculado": False,
@@ -54,4 +58,9 @@ DEFAULTS = {
     "fid_spt": None, "fid_ven": None, "fid_ped": None,
     "precios": None, "fid_precios": None, "precios_col_candidatas": None,
     "plan_manual": False,
+    "mrp_oc_pagada": {},        # {cod: {i: True}} — OC marcadas como pagadas
+    "mrp_oc_nueva_fecha": {},   # {cod: {i: date}} — OC vencidas reprogramadas
+    "mrp_oc_no_pagada": {},     # {cod: [{"fec": date, "qty": float, "tipo": str}]} — para cashflow
+    "plan_produccion_cargado": False,
+    "plan_produccion_fecha": "",
 }

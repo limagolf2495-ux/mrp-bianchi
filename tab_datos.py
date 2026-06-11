@@ -10,6 +10,9 @@ def render_tab_datos():
                              (c3,"bom","Relaciones BOM"),(c4,"forecast","Artículos FC")]:
         d = st.session_state[key]
         col.metric(label, f"{len(d):,}" if d is not None else "—")
+    if st.session_state.oc_descartadas:
+        st.caption(f"🛒 OC: {st.session_state.oc_descartadas:,} líneas descartadas "
+                   f"(insumos sin demanda en el forecast)")
 
     st.markdown("")
     any_data = any(st.session_state[k] is not None for k in ["stock","oc","bom","forecast"])

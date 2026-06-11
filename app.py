@@ -3,13 +3,14 @@ import streamlit as st
 
 import tema
 from config import GD_IDS, MESES, get_hoy, DEFAULTS, COLS_STOCK_REQ, COLS_OC_REQ, COLS_BOM_REQ
-from gsheets import merge_oc_estados
-from helpers import gsheet_url, validar_columnas
+from gsheets import cargar_plan_produccion, merge_oc_estados, obtener_fechas_drive
+from helpers import filtrar_oc_relevantes, gsheet_url, validar_columnas
 from sidebar import render_sidebar
 from tab_cashflow import render_tab_cashflow
 from tab_configuracion import render_tab_configuracion
 from tab_datos import render_tab_datos
 from tab_mrp import render_tab_mrp
+from tab_oc import render_tab_oc
 from tab_planificacion import render_tab_planificacion
 from tab_produccion import render_tab_produccion
 
@@ -24,6 +25,8 @@ for k, v in DEFAULTS.items():
 # ── Auto-load Google Drive ─────────────────────────────────────────────────────
 if not st.session_state.gd_cargado:
     with st.spinner("Cargando datos desde Google Drive..."):
+        st.session_state.gd_fechas = obtener_fechas_drive()
+
         _url = gsheet_url(GD_IDS["stock"])
         try:
             df = pd.read_csv(_url)
@@ -31,7 +34,8 @@ if not st.session_state.gd_cargado:
             validar_columnas(df, COLS_STOCK_REQ, "stock (Google Drive)")
             df["stock"] = pd.to_numeric(df["stock"], errors="coerce").fillna(0)
             st.session_state.stock = df
-            st.session_state.fecha_corte_stock = get_hoy()
+            _f_stock = st.session_state.gd_fechas.get("stock")
+            st.session_state.fecha_corte_stock = _f_stock.date() if _f_stock else get_hoy()
         except ValueError as e:
             st.error(f"⚠️ Stock — {e}")
         except Exception as e:
@@ -44,8 +48,7 @@ if not st.session_state.gd_cargado:
             validar_columnas(df, COLS_OC_REQ, "ordenes (Google Drive)")
             df["cantidad_oc"] = pd.to_numeric(df["cantidad_oc"], errors="coerce").fillna(0)
             df["fecha_entrega"] = pd.to_datetime(df["fecha_entrega"], errors="coerce").dt.date
-            st.session_state.oc = df
-            merge_oc_estados(df)
+            st.session_state.oc_raw = df
         except ValueError as e:
             st.error(f"⚠️ Órdenes de compra — {e}")
         except Exception as e:
@@ -87,18 +90,37 @@ if not st.session_state.gd_cargado:
         except Exception as e:
             st.error(f"⚠️ Forecast — no se pudo cargar desde Google Drive.\nURL: {_url}\nError: {e}")
 
+        # OC: filtrar por insumos con demanda en el forecast y recién ahí mergear estados
+        if st.session_state.oc_raw is not None:
+            oc_filtrado, n_desc = filtrar_oc_relevantes(
+                st.session_state.oc_raw, st.session_state.bom, st.session_state.forecast)
+            st.session_state.oc = oc_filtrado
+            st.session_state.oc_descartadas = n_desc
+            merge_oc_estados(oc_filtrado)
+
     st.session_state.gd_cargado = True
+
+# ── Auto-cargar plan de producción guardado ────────────────────────────────────
+if not st.session_state.plan_produccion_cargado:
+    plan_gs, err_plan = cargar_plan_produccion()
+    if plan_gs and not st.session_state.produccion:
+        st.session_state.produccion = plan_gs
+        st.session_state.prod_listo = True
+        st.session_state.plan_calculado = True
+    st.session_state.plan_produccion_cargado = True
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 render_sidebar()
 
 # ── Tabs ───────────────────────────────────────────────────────────────────────
-tab_datos, tab_plan, tab_prod, tab_mrp, tab_cf, tab_cfg = st.tabs(
-    ["📋 Datos", "📊 Planificación", "🏭 Producción", "📦 MRP", "💰 Cash-Flow", "⚙️ Configuración"]
+tab_datos, tab_oc, tab_plan, tab_prod, tab_mrp, tab_cf, tab_cfg = st.tabs(
+    ["📋 Datos", "🧾 OC", "📊 Planificación", "🏭 Producción", "📦 MRP", "💰 Cash-Flow", "⚙️ Configuración"]
 )
 
 with tab_datos:
     render_tab_datos()
+with tab_oc:
+    render_tab_oc()
 with tab_plan:
     render_tab_planificacion()
 with tab_prod:

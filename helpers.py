@@ -18,6 +18,23 @@ def validar_columnas(df, cols_requeridas, nombre):
         )
 
 
+def filtrar_oc_relevantes(oc_df, bom_df, fc_df):
+    """Filtra las OC dejando solo insumos demandados por artículos del forecast.
+    Devuelve (df_filtrado, n_descartadas). Sin BOM o forecast no filtra."""
+    if oc_df is None or bom_df is None or fc_df is None:
+        return oc_df, 0
+    cols_mes = [c for c in fc_df.columns if c not in ("articulo", "descripcion")]
+    if not cols_mes:
+        return oc_df, 0
+    demanda = fc_df[cols_mes].sum(axis=1)
+    arts_dem = set(fc_df.loc[demanda > 0, "articulo"].astype(str).str.strip())
+    insumos_rel = set(
+        bom_df.loc[bom_df["articulo"].astype(str).str.strip().isin(arts_dem),
+                   "codigo_insumo"].astype(str).str.strip())
+    mask = oc_df["codigo"].astype(str).str.strip().isin(insumos_rel)
+    return oc_df[mask].reset_index(drop=True), int((~mask).sum())
+
+
 def gsheet_url(sid, fmt="csv"):
     return f"https://docs.google.com/spreadsheets/d/{sid}/export?format={fmt}"
 

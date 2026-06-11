@@ -53,21 +53,53 @@ def calcular_mrp():
 
     oc_vigente = {}
     oc_vencida_total = {}
+    oc_venc_parcial_local = {}
+    oc_no_pagada = {}
     oc_detalle = {}
     if oc_df is not None:
+        oc_estados_ss = st.session_state.mrp_oc_estados
+        oc_pagada_ss  = st.session_state.mrp_oc_pagada
+        oc_nuevas_ss  = st.session_state.mrp_oc_nueva_fecha
+
+        oc_by_cod = {}
         for _, r in oc_df.iterrows():
             cod = str(r[COL_OC_COD])
             qty = float(r[COL_OC_QTY])
             fec = r[COL_OC_FECHA]
+            oc_id = str(r.get("id", "") or "")
             if pd.isna(fec): continue
-            oc_detalle.setdefault(cod, []).append({
-                "Fecha entrega": fec, "Cantidad OC": qty,
-                "Estado": "⚠️ Vencida" if fec < hoy else "✅ Vigente"
-            })
-            if fec < hoy:
-                oc_vencida_total[cod] = oc_vencida_total.get(cod, 0) + qty
-            elif fec <= limite_hz:
-                oc_vigente[cod] = oc_vigente.get(cod, 0) + qty
+            oc_by_cod.setdefault(cod, []).append((fec, qty, oc_id))
+
+        for cod, entries in oc_by_cod.items():
+            tipo       = stock_map.get(cod, {}).get("tipo", "")
+            estados_cod = oc_estados_ss.get(cod, {})
+            pagos_cod   = oc_pagada_ss.get(cod, {})
+            nuevas_cod  = oc_nuevas_ss.get(cod, {})
+            for i, (fec, qty, oc_id) in enumerate(entries):
+                nueva_fec    = nuevas_cod.get(i)
+                fec_efectiva = nueva_fec if nueva_fec else fec
+                raw_estado = "⚠️ Vencida" if fec < hoy else "✅ Vigente"
+                oc_detalle.setdefault(cod, []).append({
+                    "N° OC": oc_id,
+                    "Fecha entrega": fec, "Cantidad OC": qty,
+                    "Estado": raw_estado, "Nueva fecha": nueva_fec,
+                })
+                pagada = pagos_cod.get(i, False)
+                if fec_efectiva < hoy:
+                    oc_vencida_total[cod] = oc_vencida_total.get(cod, 0) + qty
+                    if estados_cod.get(i) == "🕐 Pendiente":
+                        oc_venc_parcial_local[cod] = oc_venc_parcial_local.get(cod, 0) + qty
+                        if not pagada:
+                            oc_no_pagada.setdefault(cod, []).append(
+                                {"fec": fec_efectiva, "qty": qty, "tipo": tipo})
+                elif fec_efectiva <= limite_hz:
+                    if fec < hoy:
+                        # vencida reprogramada a futuro: cuenta como vigente
+                        oc_vencida_total[cod] = oc_vencida_total.get(cod, 0) + qty
+                    oc_vigente[cod] = oc_vigente.get(cod, 0) + qty
+                    if not pagada:
+                        oc_no_pagada.setdefault(cod, []).append(
+                            {"fec": fec_efectiva, "qty": qty, "tipo": tipo})
 
     dem = {}
     mes_act_key = mes_key(hoy.year, hoy.month - 1)
@@ -149,7 +181,7 @@ def calcular_mrp():
         stk  = s["stock"]
         oc_v = oc_vigente.get(cod, 0)
         oc_ve_total   = oc_vencida_total.get(cod, 0)
-        oc_ve_parcial = st.session_state.mrp_oc_venc_parcial.get(cod, 0.0)
+        oc_ve_parcial = oc_venc_parcial_local.get(cod, 0.0)
         cobert = stk + oc_v + oc_ve_parcial
 
         nec_sem   = [round(nec.get((cod, i), 0)) for i in range(n_sems)]
@@ -230,4 +262,5 @@ def calcular_mrp():
     st.session_state.mrp_result         = resultados
     st.session_state.mrp_sem_headers    = sem_headers
     st.session_state.mrp_todas_sems     = todas_sems
+    st.session_state.mrp_oc_no_pagada   = oc_no_pagada
     st.session_state.mrp_desactualizado = False

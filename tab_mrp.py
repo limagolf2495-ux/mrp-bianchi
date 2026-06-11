@@ -4,7 +4,7 @@ import streamlit as st
 
 import tema
 from config import get_hoy
-from gsheets import guardar_oc_estados
+from gsheets import guardar_oc_estados, guardar_pagos_oc
 from helpers import exportar_excel
 from mrp_calc import calcular_mrp
 
@@ -327,35 +327,88 @@ def render_tab_mrp():
                         guardar_oc_estados()
                         st.rerun()
 
+            col_bp2, col_br2, _ = st.columns([1.8, 1.8, 5])
+            with col_bp2:
+                if st.button("💲 Marcar todas pagadas", key=f"btn_all_pag_{cod_sel}",
+                             use_container_width=True):
+                    st.session_state.mrp_oc_pagada[cod_sel] = {i: True for i in range(len(oc_det))}
+                    st.session_state.mrp_desactualizado = True
+                    guardar_pagos_oc()
+                    st.rerun()
+            with col_br2:
+                if st.button("↺ Restablecer pagos", key=f"btn_all_nopag_{cod_sel}",
+                             use_container_width=True):
+                    st.session_state.mrp_oc_pagada[cod_sel] = {}
+                    st.session_state.mrp_desactualizado = True
+                    guardar_pagos_oc()
+                    st.rerun()
+
             estados_guardados = st.session_state.mrp_oc_estados.get(cod_sel, {})
+            nuevas_guardadas  = st.session_state.mrp_oc_nueva_fecha.get(cod_sel, {})
             rows_oc = []
             for i, o in enumerate(oc_det):
                 es_vencida    = o["Estado"] == "⚠️ Vencida"
                 estado_actual = estados_guardados.get(i, o["Estado"]) if es_vencida else o["Estado"]
-                rows_oc.append({"Fecha entrega": o["Fecha entrega"],
-                                "Cantidad OC": int(o["Cantidad OC"]), "Estado": estado_actual})
+                rows_oc.append({
+                    "N° OC": o.get("N° OC", ""),
+                    "Fecha entrega": o["Fecha entrega"],
+                    "Cantidad OC": int(o["Cantidad OC"]),
+                    "Estado": estado_actual,
+                    "Nueva fecha": nuevas_guardadas.get(i),
+                    "Pagada": st.session_state.mrp_oc_pagada.get(cod_sel, {}).get(i, False),
+                })
             df_oc     = pd.DataFrame(rows_oc)
             edited_oc = st.data_editor(df_oc, column_config={
+                "N° OC": st.column_config.TextColumn("N° OC", disabled=True, width="small"),
                 "Fecha entrega": st.column_config.DateColumn("Fecha entrega", disabled=True),
                 "Cantidad OC": st.column_config.NumberColumn("Cantidad OC", disabled=True, format="%d"),
                 "Estado": st.column_config.SelectboxColumn("Estado",
                     options=["✅ Vigente", "⚠️ Vencida", "🕐 Pendiente"], required=True,
                     help="Cambiá a 🕐 Pendiente para incluir la cantidad en la cobertura"),
+                "Nueva fecha": st.column_config.DateColumn("Nueva fecha", min_value=hoy,
+                    help="Nueva fecha de entrega confirmada por el proveedor (solo OC vencidas). "
+                         "Al cargarla, la línea pasa a 🕐 Pendiente y cuenta como vigente en esa semana."),
+                "Pagada": st.column_config.CheckboxColumn(
+                    "Pagada",
+                    help="Marcá si el pago fue enviado al proveedor. Las OC pagadas se excluyen del cash-flow de compromisos pendientes."),
             }, use_container_width=True, hide_index=True, key=f"oc_editor_{cod_sel}")
 
             nuevos_estados  = {}
+            nuevas_fechas   = {}
+            fechas_cambiaron = False
             total_pendiente = 0.0
+            nuevos_pagos    = {}
+            pagos_cambiaron = False
             for i, row in edited_oc.iterrows():
                 if oc_det[i]["Estado"] == "⚠️ Vencida":
-                    nuevos_estados[i] = row["Estado"]
-                    if row["Estado"] == "🕐 Pendiente":
+                    nf = row["Nueva fecha"]
+                    nf = None if pd.isna(nf) else (nf.date() if hasattr(nf, "date") else nf)
+                    estado_fila = row["Estado"]
+                    if nf:
+                        estado_fila = "🕐 Pendiente"  # nueva fecha implica Pendiente
+                        nuevas_fechas[i] = nf
+                    if nf != nuevas_guardadas.get(i):
+                        fechas_cambiaron = True
+                    nuevos_estados[i] = estado_fila
+                    if estado_fila == "🕐 Pendiente":
                         total_pendiente += float(oc_det[i]["Cantidad OC"])
+                nuevo_pago = bool(row["Pagada"])
+                prev_pago  = st.session_state.mrp_oc_pagada.get(cod_sel, {}).get(i, False)
+                if nuevo_pago:
+                    nuevos_pagos[i] = True
+                if nuevo_pago != prev_pago:
+                    pagos_cambiaron = True
             st.session_state.mrp_oc_estados[cod_sel] = nuevos_estados
+            st.session_state.mrp_oc_nueva_fecha[cod_sel] = nuevas_fechas
             prev_parcial = st.session_state.mrp_oc_venc_parcial.get(cod_sel, 0.0)
-            if total_pendiente != prev_parcial:
+            if total_pendiente != prev_parcial or fechas_cambiaron:
                 st.session_state.mrp_oc_venc_parcial[cod_sel] = total_pendiente
                 st.session_state.mrp_desactualizado = True
                 guardar_oc_estados()
+            st.session_state.mrp_oc_pagada[cod_sel] = nuevos_pagos
+            if pagos_cambiaron:
+                st.session_state.mrp_desactualizado = True
+                guardar_pagos_oc()
             if total_pendiente > 0:
                 st.caption(f"Suma a cobertura: {round(total_pendiente):,} en estado Pendiente. "
                            f"Recalculá el MRP para aplicar.")

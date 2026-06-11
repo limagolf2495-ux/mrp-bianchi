@@ -6,8 +6,27 @@ import streamlit as st
 
 from config import DEFAULTS, get_hoy, MESES, COLS_STOCK_REQ, COLS_OC_REQ, COLS_BOM_REQ
 from gsheets import merge_oc_estados
-from helpers import validar_columnas
+from helpers import filtrar_oc_relevantes, validar_columnas
 from precios import procesar_precios_pbi
+
+
+def _help_drive(key, fallback=None):
+    """Tooltip con la fecha de última actualización del archivo en Drive."""
+    f = st.session_state.gd_fechas.get(key)
+    if f:
+        return f"Última actualización en Drive: {f.strftime('%d/%m/%Y %H:%M')}"
+    return fallback
+
+
+def _refiltrar_oc():
+    """Re-aplica el filtro de OC relevantes y reconstruye estados."""
+    if st.session_state.oc_raw is None:
+        return
+    oc_filtrado, n_desc = filtrar_oc_relevantes(
+        st.session_state.oc_raw, st.session_state.bom, st.session_state.forecast)
+    st.session_state.oc = oc_filtrado
+    st.session_state.oc_descartadas = n_desc
+    merge_oc_estados(oc_filtrado)
 
 
 def render_sidebar():
@@ -27,7 +46,8 @@ def render_sidebar():
         st.caption("MRP · Plan de Compras de Insumos")
         st.markdown("---")
 
-        f = st.file_uploader("📦 stock.csv", type=["csv"], key=f"up_stock_{uk}")
+        f = st.file_uploader("📦 stock.csv", type=["csv"], key=f"up_stock_{uk}",
+                             help=_help_drive("stock"))
         if f and f.file_id != st.session_state.fid_stock:
             try:
                 df = pd.read_csv(f, dtype=str)
@@ -44,14 +64,8 @@ def render_sidebar():
             except Exception as e:
                 st.error(f"No se pudo leer '{f.name}': {e}")
 
-        if st.session_state.stock is not None and st.session_state.fecha_corte_stock:
-            nueva_fc = st.date_input("📅 Fecha de corte del stock",
-                value=st.session_state.fecha_corte_stock, max_value=hoy, key=f"fc_stock_{uk}")
-            if nueva_fc != st.session_state.fecha_corte_stock:
-                st.session_state.fecha_corte_stock = nueva_fc
-                st.session_state.mrp_desactualizado = True
-
-        f = st.file_uploader("🛒 ordenes.csv", type=["csv"], key=f"up_oc_{uk}")
+        f = st.file_uploader("🛒 ordenes.csv", type=["csv"], key=f"up_oc_{uk}",
+                             help=_help_drive("ordenes"))
         if f and f.file_id != st.session_state.fid_oc:
             try:
                 df = pd.read_csv(f, dtype=str)
@@ -59,17 +73,22 @@ def render_sidebar():
                 validar_columnas(df, COLS_OC_REQ, "ordenes.csv")
                 df["cantidad_oc"] = pd.to_numeric(df["cantidad_oc"], errors="coerce").fillna(0)
                 df["fecha_entrega"] = pd.to_datetime(df["fecha_entrega"], errors="coerce").dt.date
-                st.session_state.oc = df
+                st.session_state.oc_raw = df
                 st.session_state.fid_oc = f.file_id
                 st.session_state.mrp_desactualizado = True
-                merge_oc_estados(df)
-                st.success(f"✓ {len(df):,} líneas OC")
+                _refiltrar_oc()
+                n_desc = st.session_state.oc_descartadas
+                msg = f"✓ {len(st.session_state.oc):,} líneas OC"
+                if n_desc:
+                    msg += f" ({n_desc:,} descartadas: insumos sin demanda en forecast)"
+                st.success(msg)
             except ValueError as e:
                 st.error(str(e))
             except Exception as e:
                 st.error(f"No se pudo leer '{f.name}': {e}")
 
-        f = st.file_uploader("🔗 bom.csv", type=["csv"], key=f"up_bom_{uk}")
+        f = st.file_uploader("🔗 bom.csv", type=["csv"], key=f"up_bom_{uk}",
+                             help=_help_drive("bom"))
         if f and f.file_id != st.session_state.fid_bom:
             try:
                 df = pd.read_csv(f, dtype=str)
@@ -79,13 +98,15 @@ def render_sidebar():
                 st.session_state.bom = df
                 st.session_state.fid_bom = f.file_id
                 st.session_state.mrp_desactualizado = True
+                _refiltrar_oc()
                 st.success(f"✓ {len(df):,} relaciones BOM")
             except ValueError as e:
                 st.error(str(e))
             except Exception as e:
                 st.error(f"No se pudo leer '{f.name}': {e}")
 
-        f = st.file_uploader("📊 forecast.xlsx", type=["xlsx","xls"], key=f"up_fc_{uk}")
+        f = st.file_uploader("📊 forecast.xlsx", type=["xlsx","xls"], key=f"up_fc_{uk}",
+                             help=_help_drive("forecast"))
         if f and f.file_id != st.session_state.fid_fc:
             try:
                 df = pd.read_excel(f)
@@ -107,6 +128,7 @@ def render_sidebar():
                 st.session_state.fid_fc = f.file_id
                 st.session_state.prod_listo = False
                 st.session_state.mrp_desactualizado = True
+                _refiltrar_oc()
                 meses_det = [c for c in df.columns if c not in ["articulo","descripcion"]]
                 st.success(f"✓ {len(df):,} artículos | {', '.join(meses_det)}")
             except ValueError as e:
@@ -204,9 +226,12 @@ def render_sidebar():
                 st.error(str(e))
 
         st.markdown("---")
-        for nombre, key in [("Stock","stock"),("OC","oc"),("BOM","bom"),("Forecast","forecast")]:
+        for nombre, key, gd_key in [("Stock","stock","stock"),("OC","oc","ordenes"),
+                                     ("BOM","bom","bom"),("Forecast","forecast","forecast")]:
             ok = st.session_state[key] is not None
-            st.markdown(f"{'✅' if ok else '⬜'} {nombre}")
+            fgd = st.session_state.gd_fechas.get(gd_key)
+            sufijo = f" · {fgd.strftime('%d/%m')}" if ok and fgd else ""
+            st.markdown(f"{'✅' if ok else '⬜'} {nombre}{sufijo}")
         for nombre, key in [("Stock PT","stock_pt"),("Ventas","ventas_pt"),("Pedidos","pedidos_pt")]:
             ok = st.session_state[key] is not None
             st.markdown(f"{'✅' if ok else '⬜'} {nombre}")

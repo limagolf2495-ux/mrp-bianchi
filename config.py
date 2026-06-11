@@ -29,6 +29,10 @@ GD_IDS = {
     "ordenes":  "11b__i6OcJUz1Duwzbyo6cy0pEXySob6oOXFpiS0lMCU",
     "bom":      "1CH7jaqmfYiefoGRkHj_n4PwDDnHy1fLX9cEz7dzgqCg",
     "forecast": "1TUEwHs4S7lVJWLAHGJNZd0ZoRDBO5VMGQ4wvq816cqo",
+    "stock_pt": "1oFWHsYvfO_wyrHQdmjsgeTt-5yIAb9dx5uvSvV230To",
+    "ventas":   "1pst0tT0UwlLnUs0hkyxXKFHN3krazUyPP7Hk3y3p4-4",
+    "pedidos":  "1y6MTpwtM4A-VhWZDFzzSzJ1A6RUpk3-f3z9-WgKXBLU",
+    "precios":  "1UcbkbrlLNBi7lBicMVjuciZkpUdt8QnPHRBDzSliZ88",
 }
 GD_ESTADOS_ID = "1CpDx8apuRtI4G3RfN1QXLqp-pEdkATX3haj6iIfCfyE"
 

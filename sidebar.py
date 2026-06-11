@@ -140,7 +140,7 @@ def render_sidebar():
         st.caption("📊 Planificación")
 
         f = st.file_uploader("🏭 stock_pt.csv", type=["csv"], key=f"up_spt_{uk}",
-                             help="Columnas: articulo, stock_pt")
+                             help=_help_drive("stock_pt", "Columnas: articulo, stock_pt"))
         if f and f.file_id != st.session_state.fid_spt:
             try:
                 df = pd.read_csv(f, dtype=str)
@@ -154,7 +154,7 @@ def render_sidebar():
             except Exception as e: st.error(str(e))
 
         f = st.file_uploader("💰 ventas.csv", type=["csv"], key=f"up_ven_{uk}",
-                             help="Columnas: articulo, fecha, cantidad")
+                             help=_help_drive("ventas", "Columnas: articulo, fecha, cantidad"))
         if f and f.file_id != st.session_state.fid_ven:
             try:
                 df = pd.read_csv(f, dtype=str)
@@ -175,7 +175,7 @@ def render_sidebar():
             except Exception as e: st.error(str(e))
 
         f = st.file_uploader("📋 pedidos.csv", type=["csv"], key=f"up_ped_{uk}",
-                             help="Columnas: articulo, fecha, cantidad")
+                             help=_help_drive("pedidos", "Columnas: articulo, fecha, cantidad"))
         if f and f.file_id != st.session_state.fid_ped:
             try:
                 df = pd.read_csv(f, dtype=str)
@@ -204,7 +204,7 @@ def render_sidebar():
 
         f = st.file_uploader("💲 precios.csv / .xlsx", type=["csv","xlsx","xls"],
                              key=f"up_precios_{uk}",
-                             help="Columnas requeridas: codigo, precio_unitario. Opcional: moneda")
+                             help=_help_drive("precios", "Columnas: articulo, fecha_recepcion, costo_unitario"))
         if f and f.file_id != st.session_state.fid_precios:
             try:
                 if f.name.endswith(".csv"):
@@ -232,9 +232,12 @@ def render_sidebar():
             fgd = st.session_state.gd_fechas.get(gd_key)
             sufijo = f" · {fgd.strftime('%d/%m')}" if ok and fgd else ""
             st.markdown(f"{'✅' if ok else '⬜'} {nombre}{sufijo}")
-        for nombre, key in [("Stock PT","stock_pt"),("Ventas","ventas_pt"),("Pedidos","pedidos_pt")]:
+        for nombre, key, gd_key in [("Stock PT","stock_pt","stock_pt"),("Ventas","ventas_pt","ventas"),
+                                     ("Pedidos","pedidos_pt","pedidos")]:
             ok = st.session_state[key] is not None
-            st.markdown(f"{'✅' if ok else '⬜'} {nombre}")
+            fgd = st.session_state.gd_fechas.get(gd_key)
+            sufijo = f" · {fgd.strftime('%d/%m')}" if ok and fgd else ""
+            st.markdown(f"{'✅' if ok else '⬜'} {nombre}{sufijo}")
         if st.session_state.precios is not None:
             prec_df = st.session_state.precios
             if "fecha_ultima_oc" in prec_df.columns:

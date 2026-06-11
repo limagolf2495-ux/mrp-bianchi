@@ -5,6 +5,7 @@ import tema
 from config import GD_IDS, MESES, get_hoy, DEFAULTS, COLS_STOCK_REQ, COLS_OC_REQ, COLS_BOM_REQ
 from gsheets import cargar_plan_produccion, merge_oc_estados, obtener_fechas_drive
 from helpers import filtrar_oc_relevantes, gsheet_url, validar_columnas
+from precios import procesar_precios_pbi
 from sidebar import render_sidebar
 from tab_cashflow import render_tab_cashflow
 from tab_configuracion import render_tab_configuracion
@@ -89,6 +90,58 @@ if not st.session_state.gd_cargado:
             st.error(f"⚠️ Forecast — {e}")
         except Exception as e:
             st.error(f"⚠️ Forecast — no se pudo cargar desde Google Drive.\nURL: {_url}\nError: {e}")
+
+        _url = gsheet_url(GD_IDS["stock_pt"])
+        try:
+            df = pd.read_csv(_url, dtype=str)
+            df.columns = df.columns.str.strip().str.lower()
+            df["stock_pt"] = pd.to_numeric(df["stock_pt"], errors="coerce").fillna(0)
+            df["articulo"] = df["articulo"].astype(str).str.strip()
+            st.session_state.stock_pt = df
+        except Exception as e:
+            st.warning(f"⚠️ Stock PT — no se pudo cargar desde Google Drive: {e}")
+
+        _hoy_gd = get_hoy()
+        _url = gsheet_url(GD_IDS["ventas"])
+        try:
+            df = pd.read_csv(_url, dtype=str)
+            df.columns = df.columns.str.strip().str.lower()
+            df["articulo"] = df["articulo"].astype(str).str.strip()
+            df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce", dayfirst=False)
+            df["cantidad"] = pd.to_numeric(df["cantidad"], errors="coerce").fillna(0)
+            df = df[(df["fecha"].dt.month == _hoy_gd.month) & (df["fecha"].dt.year == _hoy_gd.year)]
+            df = df.groupby("articulo", as_index=False)["cantidad"].sum()
+            df = df.rename(columns={"cantidad": "ventas_mes"})
+            st.session_state.ventas_pt = df
+        except Exception as e:
+            st.warning(f"⚠️ Ventas — no se pudo cargar desde Google Drive: {e}")
+
+        _url = gsheet_url(GD_IDS["pedidos"])
+        try:
+            df = pd.read_csv(_url, dtype=str)
+            df.columns = df.columns.str.strip().str.lower()
+            df["articulo"] = df["articulo"].astype(str).str.strip()
+            df["cantidad"] = pd.to_numeric(df["cantidad"], errors="coerce").fillna(0)
+            if "fecha" in df.columns:
+                df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce", dayfirst=False)
+                df = df[(df["fecha"].dt.month == _hoy_gd.month) & (df["fecha"].dt.year == _hoy_gd.year)]
+            df = df.groupby("articulo", as_index=False)["cantidad"].sum()
+            df = df.rename(columns={"cantidad": "pedidos_mes"})
+            st.session_state.pedidos_pt = df
+        except Exception as e:
+            st.warning(f"⚠️ Pedidos — no se pudo cargar desde Google Drive: {e}")
+
+        _url = gsheet_url(GD_IDS["precios"])
+        try:
+            df = pd.read_csv(_url, dtype=str)
+            df_proc, cols_fail = procesar_precios_pbi(df)
+            if df_proc is not None:
+                st.session_state.precios = df_proc
+            else:
+                st.warning(f"⚠️ Precios — columnas requeridas no encontradas "
+                           f"(articulo, fecha_recepcion, costo_unitario). Columnas: {cols_fail}")
+        except Exception as e:
+            st.warning(f"⚠️ Precios — no se pudo cargar desde Google Drive: {e}")
 
         # OC: filtrar por insumos con demanda en el forecast y recién ahí mergear estados
         if st.session_state.oc_raw is not None:

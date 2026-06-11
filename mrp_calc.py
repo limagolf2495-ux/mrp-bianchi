@@ -66,7 +66,7 @@ def calcular_mrp():
             cod = str(r[COL_OC_COD])
             qty = float(r[COL_OC_QTY])
             fec = r[COL_OC_FECHA]
-            oc_id = str(r.get("id", "") or "")
+            oc_id = str(r["id"]) if "id" in r.index and pd.notna(r["id"]) else ""
             if pd.isna(fec): continue
             oc_by_cod.setdefault(cod, []).append((fec, qty, oc_id))
 

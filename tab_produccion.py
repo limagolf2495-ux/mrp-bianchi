@@ -3,6 +3,7 @@ import streamlit as st
 
 import tema
 from config import get_hoy
+from gsheets import guardar_plan_produccion
 from helpers import distribuir, mes_key, semanas_desde_hoy
 
 
@@ -25,6 +26,12 @@ def render_tab_produccion():
     mes_act_key = mes_key(hoy.year, hoy.month - 1)
     dist        = st.session_state.dist_4 if n_sem <= 4 else st.session_state.dist_5
 
+    fecha_plan = st.session_state.get("plan_produccion_fecha", "")
+    if fecha_plan and st.session_state.get("plan_calculado"):
+        st.markdown(tema.banner(
+            f"Plan restaurado desde Google Sheets · guardado el <strong>{fecha_plan}</strong> · "
+            "Guardá para actualizar", "ok"), unsafe_allow_html=True)
+
     if not st.session_state.prod_listo:
         prod = {}
         for _, row in fc.iterrows():
@@ -45,7 +52,7 @@ def render_tab_produccion():
     cards_placeholder = st.empty()
     st.markdown("")
 
-    col_b, col_add, col_r = st.columns([5, 1.3, 1.3])
+    col_b, col_add, col_r, col_save = st.columns([5, 1.3, 1.3, 1.3])
     with col_b:
         busqueda = st.text_input("Buscar", placeholder="🔍 Buscar por descripción o código...",
                                  label_visibility="collapsed")
@@ -55,6 +62,13 @@ def render_tab_produccion():
     with col_r:
         if st.button("↺ Redistribuir", use_container_width=True):
             st.session_state["confirm_redist"] = True
+    with col_save:
+        if st.button("💾 Guardar Plan", use_container_width=True,
+                     help="Guarda el plan en Google Sheets para próximas sesiones"):
+            if guardar_plan_produccion(st.session_state.produccion):
+                st.success("✓ Plan guardado en Google Sheets")
+            else:
+                st.error("✗ No se pudo guardar. Verificá las credenciales GCP.")
 
     if st.session_state.get("show_add"):
         with st.container(border=True):
@@ -81,10 +95,12 @@ def render_tab_produccion():
                             **{f"s{i+1}": 0 for i in range(n_sem)}}
                         st.session_state.mrp_desactualizado = True
                         st.session_state["show_add"] = False
+                        st.session_state["_prod_rebuild_needed"] = True
                         st.rerun()
             with col_cancel:
                 if st.button("✕", key="btn_add_cancel"):
                     st.session_state["show_add"] = False
+                    st.session_state["_prod_rebuild_needed"] = True
                     st.rerun()
 
     if st.session_state.get("confirm_redist"):
@@ -99,21 +115,27 @@ def render_tab_produccion():
                             datos[f"s{i+1}"] = vals[i]
                     st.session_state.mrp_desactualizado = True
                     st.session_state["confirm_redist"] = False
+                    st.session_state["_prod_rebuild_needed"] = True
                     st.rerun()
             with col_no:
                 if st.button("✕ Cancelar", key="btn_redist_cancel"):
                     st.session_state["confirm_redist"] = False
+                    st.session_state["_prod_rebuild_needed"] = True
                     st.rerun()
 
-    rows_all = []
-    for art, dd in prod.items():
-        rows_all.append({
-            "Código": art, "Descripción": dd.get("desc",""),
-            **{sem_labels[i]: dd.get(f"s{i+1}",0) for i in range(n_sem)},
-            "Distribución": [dd.get(f"s{i+1}",0) for i in range(n_sem)],
-            "_forecast": int(dd.get("forecast",0)),
-        })
-    df_all = pd.DataFrame(rows_all) if rows_all else pd.DataFrame()
+    _cache_key = f"_prod_df_{uk}"
+    if _cache_key not in st.session_state or st.session_state.get("_prod_rebuild_needed", True):
+        rows_all = []
+        for art, dd in prod.items():
+            rows_all.append({
+                "Código": art, "Descripción": dd.get("desc",""),
+                **{sem_labels[i]: dd.get(f"s{i+1}",0) for i in range(n_sem)},
+                "Distribución": [dd.get(f"s{i+1}",0) for i in range(n_sem)],
+                "_forecast": int(dd.get("forecast",0)),
+            })
+        st.session_state[_cache_key] = pd.DataFrame(rows_all) if rows_all else pd.DataFrame()
+        st.session_state["_prod_rebuild_needed"] = False
+    df_all = st.session_state[_cache_key]
 
     if df_all.empty:
         st.info("No hay artículos en el plan. Cargá el forecast o agregá artículos manualmente.")

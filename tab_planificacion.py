@@ -137,8 +137,8 @@ def render_tab_planificacion():
         "Stock Obj":   st.column_config.NumberColumn("Stock Obj", format="%d", disabled=True,
                        help="Buffer objetivo calculado según la Regla"),
         "Plan":        st.column_config.NumberColumn("Plan", format="%d",
-                       disabled=not plan_manual,
-                       help="Calculado automáticamente · en modo manual podés editarlo directamente"),
+                       disabled=False,
+                       help="Editable — ajustá manualmente si necesitás sumar o restar por fuera de las reglas"),
         "Regla":       st.column_config.TextColumn("Regla", width="small",
                        help="1m = 1 mes cobertura, 2m = 2 meses, 30% = 30% del forecast, o número fijo"),
     }
@@ -154,8 +154,9 @@ def render_tab_planificacion():
     )
 
     st.caption(
-        "Editá la columna **Regla** por artículo (ej: `1m`, `2m`, `30%`, `5000`) y "
-        "hacé click en **Confirmar Plan**. El Plan y Stock Obj se recalculan al confirmar."
+        "Editá la columna **Regla** y apretá **⚡ Confirmar Plan** para recalcular con las reglas nuevas, "
+        "o modificá **Plan** directamente para ajustar por fuera de las reglas. "
+        "El valor de Plan que confirmes es el que va al MRP."
     )
     st.markdown("")
 
@@ -179,28 +180,7 @@ def render_tab_planificacion():
                 art    = str(er["Artículo"])
                 fc_a   = float(er["Forecast"])
                 desc_a = str(er.get("Descripción", art))
-
-                if plan_manual:
-                    plan_a = max(0.0, float(er.get("Plan", 0)))
-                else:
-                    spt_a = 0.0
-                    if spt_df is not None:
-                        ra = spt_df[spt_df["articulo"].astype(str) == art]
-                        if not ra.empty: spt_a = float(ra["stock_pt"].values[0])
-
-                    ven_a = 0.0
-                    if ven_df is not None:
-                        ra = ven_df[ven_df["articulo"].astype(str) == art]
-                        if not ra.empty: ven_a = float(ra["ventas_mes"].values[0])
-
-                    ped_a = 0.0
-                    if ped_df is not None:
-                        ra = ped_df[ped_df["articulo"].astype(str) == art]
-                        if not ra.empty: ped_a = float(ra["pedidos_mes"].values[0])
-
-                    regla_a   = new_reglas_plan.get(art, "1m")
-                    stk_obj_a = calcular_stock_objetivo(art, regla_a, fc_plan, mes_act_key_plan)
-                    plan_a    = max(0.0, ped_a + fc_a - ven_a - spt_a + stk_obj_a)
+                plan_a = max(0.0, float(er.get("Plan", 0)))
 
                 vals_a = distribuir(int(plan_a), n_sem_plan, dist_plan)
                 nueva_prod_plan[art] = {
@@ -214,6 +194,7 @@ def render_tab_planificacion():
             st.session_state.plan_calculado = True
             st.session_state.plan_manual = False
             st.session_state.mrp_desactualizado = True
+            st.session_state["_prod_rebuild_needed"] = True
             st.rerun()
 
     with col_save_r:

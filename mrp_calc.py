@@ -143,6 +143,7 @@ def calcular_mrp():
     bom_idx = {}
     marca_idx = {}
     art_desc_idx = {}
+    ins_desc_idx = {}
     bom_invalidas = []
     for _, r in bom_df.iterrows():
         art   = str(r[COL_BOM_ART])
@@ -158,6 +159,9 @@ def calcular_mrp():
         desc_art = str(r.get("descripcion_articulo", "")).strip()
         if desc_art:
             art_desc_idx[art] = desc_art
+        desc_ins = str(r.get("descripcion_insumo", "")).strip()
+        if desc_ins:
+            ins_desc_idx[ins] = desc_ins
     if bom_invalidas:
         st.warning(
             f"BOM: {len(bom_invalidas)} relación(es) con 'cantidad_por_unidad' ≤ 0 ignoradas — "
@@ -243,7 +247,8 @@ def calcular_mrp():
         resultados.append({
             "sem_ic": sem_ic, "sem_lb": sem_lb, "sem_kind": sem_kind, "sems_cub": sems_cub,
             "Días al quiebre": dias_quiebre_label, "_dias_quiebre": dias_quiebre_num,
-            "Tipo": s["tipo"], "Código": cod, "Descripción": s["desc"],
+            "Tipo": s["tipo"], "Código": cod,
+            "Descripción": ins_desc_idx.get(cod) or s["desc"],
             "Stock": round(stk), "OC disp.": oc_disp, "_oc_label": oc_disp_label,
             "OC vencidas": round(oc_ve_total), "_oc_ve_parcial": round(oc_ve_parcial),
             "Nec. total": round(total_nec), "Nec. neta": round(neta),

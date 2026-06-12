@@ -88,11 +88,20 @@ def render_tab_oc():
         st.success("✅ No hay OC vencidas para gestionar.")
         return
 
+    # Descripciones: stock como base, BOM pisa (insumos con OC pero sin stock
+    # quedaban sin descripción; la BOM es la fuente más completa de nombres)
     desc_map = {}
     stock_df = st.session_state.stock
     if stock_df is not None:
         desc_map = dict(zip(stock_df["codigo"].astype(str),
                             stock_df["descripcion"].astype(str)))
+    bom_df = st.session_state.bom
+    if bom_df is not None and "descripcion_insumo" in bom_df.columns:
+        for ins, d in zip(bom_df["codigo_insumo"].astype(str),
+                          bom_df["descripcion_insumo"].astype(str)):
+            d = d.strip()
+            if d and d.lower() != "nan":
+                desc_map[ins] = d
 
     st.subheader("Gestión de OC vencidas")
     st.caption("🕐 **Pendiente** = la entrega sigue en pie y suma a la cobertura del MRP. "

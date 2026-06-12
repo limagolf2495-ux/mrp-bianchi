@@ -249,6 +249,7 @@ def calcular_mrp():
             "Nec. total": round(total_nec), "Nec. neta": round(neta),
             "Sugerencia": sug, "Pedir en": fecha_pedido,
             "Cobertura": nec_sem,
+            "_compra_sem": compra_sem,
             **{sem_headers[i]: pedido_sem[i] for i in range(n_sems)},
             "_arts": list(ins_arts.get(cod, [])),
             "_arts_desc": [art_desc_idx.get(a, "") for a in ins_arts.get(cod, [])],

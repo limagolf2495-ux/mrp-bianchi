@@ -416,10 +416,11 @@ def render_tab_mrp():
             st.info("Sin OC abiertas para este insumo.")
 
         todas_s = st.session_state.mrp_todas_sems
-        if todas_s and r.get("Cobertura"):
+        compra_s = r.get("_compra_sem") or []
+        if todas_s and compra_s:
             rows_ins = []
             for i, (lbl, fec_ini, fec_fin) in enumerate(todas_s):
-                qty = r["Cobertura"][i] if i < len(r["Cobertura"]) else 0
+                qty = compra_s[i] if i < len(compra_s) else 0
                 if qty > 0:
                     rows_ins.append({
                         "N° Artículo": cod_sel,

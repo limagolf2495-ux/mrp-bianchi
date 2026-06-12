@@ -250,6 +250,55 @@ def guardar_reglas_pt(reglas):
         return False
 
 
+def cargar_lead_times():
+    """Carga lead times por tipo de insumo desde pestaña 'lead_times' del Sheet de estados.
+    Devuelve (dict {tipo: dias}, error_str). error_str es None si fue exitoso."""
+    gc = _gs_client()
+    if gc is None:
+        return {}, "Sin credenciales GCP — configurá .streamlit/secrets.toml localmente"
+    try:
+        wb = gc.open_by_key(GD_ESTADOS_ID)
+        try:
+            ws = wb.worksheet("lead_times")
+        except gspread.exceptions.WorksheetNotFound:
+            ws = wb.add_worksheet("lead_times", 100, 2)
+            ws.update("A1", [["tipo_insumo", "dias"]])
+            return {}, None
+        records = ws.get_all_records()
+        result = {}
+        for r in records:
+            tipo = str(r.get("tipo_insumo", "")).strip()
+            try:
+                dias = int(r.get("dias"))
+            except (TypeError, ValueError):
+                continue
+            if tipo and dias > 0:
+                result[tipo] = dias
+        return result, None
+    except Exception as e:
+        return {}, str(e)
+
+
+def guardar_lead_times(lead_times):
+    """Guarda lead times en pestaña 'lead_times' del Sheet de estados."""
+    gc = _gs_client()
+    if gc is None:
+        return False
+    try:
+        wb = gc.open_by_key(GD_ESTADOS_ID)
+        try:
+            ws = wb.worksheet("lead_times")
+        except gspread.exceptions.WorksheetNotFound:
+            ws = wb.add_worksheet("lead_times", 100, 2)
+        rows = [["tipo_insumo", "dias"]] + [[t, d] for t, d in lead_times.items()]
+        ws.clear()
+        ws.update("A1", rows)
+        return True
+    except Exception as e:
+        st.warning(f"⚠️ No se pudieron guardar los lead times: {e}")
+        return False
+
+
 def cargar_plan_produccion():
     """Carga el plan de producción desde pestaña 'plan_produccion' del Sheet de estados.
     Devuelve (dict, error_str). Setea st.session_state.plan_produccion_fecha como side-effect."""

@@ -67,4 +67,5 @@ DEFAULTS = {
     "mrp_oc_no_pagada": {},     # {cod: [{"fec": date, "qty": float, "tipo": str}]} — para cashflow
     "plan_produccion_cargado": False,
     "plan_produccion_fecha": "",
+    "lead_times_cargados": False,
 }

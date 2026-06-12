@@ -3,7 +3,7 @@ import streamlit as st
 
 import tema
 from config import GD_IDS, MESES, get_hoy, DEFAULTS, COLS_STOCK_REQ, COLS_OC_REQ, COLS_BOM_REQ
-from gsheets import cargar_plan_produccion, merge_oc_estados, obtener_fechas_drive
+from gsheets import cargar_lead_times, cargar_plan_produccion, merge_oc_estados, obtener_fechas_drive
 from helpers import filtrar_oc_relevantes, gsheet_url, validar_columnas
 from precios import procesar_precios_pbi
 from sidebar import render_sidebar
@@ -161,6 +161,13 @@ if not st.session_state.plan_produccion_cargado:
         st.session_state.prod_listo = True
         st.session_state.plan_calculado = True
     st.session_state.plan_produccion_cargado = True
+
+# ── Auto-cargar lead times guardados ───────────────────────────────────────────
+if not st.session_state.lead_times_cargados:
+    lt_gs, err_lt = cargar_lead_times()
+    if lt_gs:
+        st.session_state.lead_times = lt_gs
+    st.session_state.lead_times_cargados = True
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 render_sidebar()

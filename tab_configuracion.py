@@ -1,5 +1,7 @@
 import streamlit as st
 
+from gsheets import guardar_lead_times
+
 
 def render_tab_configuracion():
     st.header("Configuración")
@@ -60,6 +62,10 @@ def render_tab_configuracion():
             if new_lt != st.session_state.lead_times:
                 st.session_state.lead_times = new_lt
                 st.session_state.mrp_desactualizado = True
-            st.success("Lead times guardados.")
+            if guardar_lead_times(new_lt):
+                st.success("Lead times guardados en Google Sheets.")
+            else:
+                st.warning("Lead times guardados solo en esta sesión "
+                           "(no se pudo escribir en Google Sheets).")
     else:
         st.info("Cargá el stock para configurar los lead times.")
